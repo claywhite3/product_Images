@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engage Item Images</title>
+<style>
+:root{--bg:#f6f7f5;--card:#fff;--ink:#1b1f1c;--mute:#6a716c;--line:#e1e4e0;--accent:#1f7a4d;--accent-ink:#fff;--warn:#b45309}
+@media (prefers-color-scheme:dark){:root{--bg:#121513;--card:#1b1f1c;--ink:#e9ece9;--mute:#9aa29c;--line:#2c322e;--accent:#3fb37a;--accent-ink:#0d130f;--warn:#f59e0b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:28px 16px 8px;max-width:1100px;margin:0 auto}
+h1{margin:0;font-size:22px;letter-spacing:-.01em}
+header p{margin:4px 0 0;color:var(--mute)}
+main{max-width:1100px;margin:0 auto;padding:12px 16px 48px}
+.lookup{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px}
+@media (max-width:760px){.lookup{grid-template-columns:1fr}}
+label{font-weight:600;font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
+.row{display:flex;gap:8px;margin-top:8px}
+input{flex:1;min-width:0;font:inherit;font-size:20px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+input:focus{outline:2px solid var(--accent);outline-offset:1px}
+button{font:inherit;font-weight:600;padding:12px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.hint{color:var(--mute);font-size:13px;margin-top:8px}
+.meta{margin-top:16px}
+.meta h2{margin:0;font-size:20px}
+.meta dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:10px 0 0;font-size:14px}
+.meta dt{color:var(--mute)}
+.meta code,.tile code{font-size:13px}
+.msg{margin-top:16px;color:var(--warn);font-weight:600}
+.preview{aspect-ratio:1;border:1px solid var(--line);border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--mute);text-align:center;padding:10px}
+.preview img{width:100%;height:100%;object-fit:contain}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:28px 0 12px;flex-wrap:wrap}
+.bar input{font-size:15px;padding:9px 12px;max-width:280px}
+.count{color:var(--mute);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;text-align:left;padding:0;font-weight:400}
+.tile .ph{aspect-ratio:1;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--warn);font-size:12px;font-weight:600}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .cap{padding:8px 10px}
+.tile .cap b{display:block;font-size:13px;line-height:1.3}
+.tile .cap code{color:var(--mute)}
+.tile:hover{border-color:var(--accent)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Engage Item Images</h1>
+  <p>Look up an item image by PLU or barcode.</p>
+</header>
+<main>
+  <section class="lookup">
+    <div>
+      <label for="q">PLU or barcode</label>
+      <div class="row">
+        <input id="q" inputmode="numeric" autocomplete="off" placeholder="e.g. 4011 or 0070200856140" autofocus>
+        <button class="primary" id="go">Find</button>
+      </div>
+      <div class="hint">PLU (4–5 digits), UPC with or without check digit, or EAN/GTIN-13/14. Scanners work too.</div>
+      <div class="meta" id="meta" hidden>
+        <h2 id="m-desc"></h2>
+        <dl>
+          <dt>Image file</dt><dd><code id="m-file"></code></dd>
+          <dt>Image URL</dt><dd><a id="m-url" target="_blank" rel="noopener"></a></dd>
+          <dt>Category</dt><dd id="m-cat"></dd>
+          <dt>Stores</dt><dd id="m-stores"></dd>
+        </dl>
+        <div class="row"><button id="copy">Copy image URL</button></div>
+      </div>
+      <div class="msg" id="msg" hidden></div>
+    </div>
+    <div class="preview" id="preview">Preview appears here</div>
+  </section>
+
+  <div class="bar">
+    <button id="toggle">Show all images</button>
+    <input id="filter" placeholder="Filter list…" hidden>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="grid" id="grid" hidden></div>
+</main>
+
+<script>
+// ---- Settings -------------------------------------------------------------
+const IMAGE_DIR = "images/";          // folder next to this page
+const EXTS = ["jpg", "png", "webp"];   // tried in this order
+// Catalog: add rows here as more images are added. Use plu for produce,
+// gtin (13-digit, with check digit) for barcoded items.
+const CATALOG = [{"plu":"3283","desc":"Apple Honeycrisp Bulk","cat":"Apples","stores":4271},{"plu":"3507","desc":"Apple Cosmic Crisp Bulk","cat":"Apples","stores":4218},{"plu":"3616","desc":"Fresh Envy Apple, Each","cat":"Apples","stores":3868},{"plu":"4016","desc":"Red Delicious Apples Bulk","cat":"Apples","stores":200},{"plu":"4017","desc":"Granny Smith Apples Bulk","cat":"Apples","stores":210},{"plu":"4130","desc":"Pink Apples Bulk","cat":"Apples","stores":173},{"plu":"4131","desc":"Fuji Apples Bulk","cat":"Apples","stores":158},{"plu":"4135","desc":"Gala Apples Bulk","cat":"Apples","stores":210},{"plu":"4080","desc":"Fresh Asparagus Bunch","cat":"Asparagus","stores":4240},{"plu":"4046","desc":"Avocado Per Each","cat":"Avocados","stores":0},{"plu":"4223","desc":"Tropical Avocado","cat":"Avocados","stores":1944},{"plu":"4011","desc":"Premium Bananas","cat":"Bananas","stores":210},{"plu":"4235","desc":"Plantains","cat":"Bananas","stores":209},{"plu":"94011","desc":"Organic Bananas","cat":"Bananas","stores":4247},{"plu":"3121","desc":"Orange Bell Pepper","cat":"Bell Pepper","stores":4257},{"plu":"4065","desc":"Green Bell Pepper","cat":"Bell Pepper","stores":4292},{"plu":"4688","desc":"Red Bell Pepper","cat":"Bell Pepper","stores":4278},{"plu":"4689","desc":"Yellow Bell Pepper","cat":"Bell Pepper","stores":4258},{"plu":"3082","desc":"Fresh Broccoli Crowns","cat":"Broccoli","stores":210},{"plu":"4069","desc":"Fresh Green Cabbage","cat":"Cabbage","stores":210},{"plu":"4545","desc":"Bok Choy","cat":"Cabbage","stores":14},{"plu":"4554","desc":"Fresh Red Cabbage","cat":"Cabbage","stores":4250},{"plu":"94069","desc":"Organic Green Cabbage","cat":"Cabbage","stores":4138},{"plu":"94554","desc":"Organic Red Cabbage","cat":"Cabbage","stores":3958},{"plu":"3127","desc":"Pomegranate","cat":"Cal Seasonal","stores":0},{"plu":"4050","desc":"Cantaloupe","cat":"Cantaloupes","stores":4273},{"plu":"4070","desc":"Fresh Bunch Celery","cat":"Celery","stores":4270},{"plu":"4693","desc":"Jalapeno Peppers Bulk","cat":"Chilis","stores":138},{"plu":"4801","desc":"Tomatillos","cat":"Chilis","stores":138},{"plu":"4078","desc":"Corn Bulk","cat":"Corn","stores":82},{"plu":"4062","desc":"Cucumber","cat":"Cucumbers","stores":4295},{"plu":"4593","desc":"Hothouse Cucumbers","cat":"Cucumbers","stores":0},{"plu":"4612","desc":"Ginger Root Bulk","cat":"Ethnic Cooking","stores":14},{"plu":"4611","desc":"Jumbo Bulk Garlic","cat":"Garlic","stores":4262},{"plu":"4027","desc":"Bulk Grapefruit","cat":"Grapefruit","stores":3941},{"plu":"4022","desc":"Fresh Green Seedless Grapes","cat":"Grapes","stores":210},{"plu":"4023","desc":"Fresh Red Seedless Grapes","cat":"Grapes","stores":4125},{"plu":"4056","desc":"Fresh Black Seedless Grapes","cat":"Grapes","stores":4052},{"plu":"4636","desc":"Fresh Grown Red Globe Grapes","cat":"Grapes","stores":1871},{"plu":"4614","desc":"Bulk Collard Greens","cat":"Greens","stores":2810},{"plu":"4616","desc":"Mustard Greens","cat":"Greens","stores":3546},{"plu":"4619","desc":"Turnip Greens Bulk","cat":"Greens","stores":3467},{"plu":"4053","desc":"Bulk Lemons","cat":"Lemons","stores":220},{"plu":"4076","desc":"Green Leaf Lettuce","cat":"Lettuce","stores":4249},{"plu":"4640","desc":"Romaine Lettuce","cat":"Lettuce","stores":4270},{"plu":"4048","desc":"Bulk Persian Limes","cat":"Limes","stores":210},{"plu":"4959","desc":"Mango","cat":"Mangoes","stores":0},{"plu":"4084","desc":"Fresh & Whole Artichokes","cat":"Mixed Vegetables","stores":209},{"plu":"4089","desc":"Bunch Radishes","cat":"Mixed Vegetables","stores":4261},{"plu":"4539","desc":"Bunch Beets","cat":"Mixed Vegetables","stores":4250},{"plu":"4552","desc":"Napa Cabbage","cat":"Mixed Vegetables","stores":0},{"plu":"4629","desc":"Leeks","cat":"Mixed Vegetables","stores":0},{"plu":"4747","desc":"Rutabagas","cat":"Mixed Vegetables","stores":0},{"plu":"4889","desc":"Cilantro Bunch","cat":"Mixed Vegetables","stores":4271},{"plu":"4899","desc":"Curley Parsley","cat":"Mixed Vegetables","stores":4249},{"plu":"4901","desc":"Italian Parsley","cat":"Mixed Vegetables","stores":4252},{"plu":"3035","desc":"Fresh Grown White Nectarines","cat":"Nectarines","stores":0},{"plu":"4036","desc":"Fresh Grown Yellow Nectarines","cat":"Nectarines","stores":0},{"plu":"4082","desc":"Jumbo Red Onions Per Pound","cat":"Onions","stores":4251},{"plu":"4093","desc":"Fresh Whole Yellow Onions","cat":"Onions","stores":4259},{"plu":"4166","desc":"Bulk Sweet Onions","cat":"Onions","stores":4246},{"plu":"4663","desc":"Jumbo White Onions Per Pound","cat":"Onions","stores":4260},{"plu":"3107","desc":"Fresh Bulk Oranges","cat":"Oranges","stores":67},{"plu":"94080","desc":"Organic Asparagus Bunch","cat":"Organic Cooking Veg","stores":3487},{"plu":"94593","desc":"Organic Hot House Cucumbers","cat":"Organic Truck Veg","stores":3738},{"plu":"3112","desc":"Papaya","cat":"Papayas","stores":4254},{"plu":"4038","desc":"Fresh Grown Yellow Peaches","cat":"Peaches","stores":10},{"plu":"4401","desc":"Fresh Grown White Peaches","cat":"Peaches","stores":0},{"plu":"4409","desc":"Bartlett Pears Bulk","cat":"Pears","stores":191},{"plu":"4413","desc":"Bosc Pears Bulk","cat":"Pears","stores":0},{"plu":"4415","desc":"Red Pears Bulk","cat":"Pears","stores":18},{"plu":"4040","desc":"Fresh Grown Plums","cat":"Plums","stores":0},{"plu":"4072","desc":"Russet Baking Potatoes Per Pound","cat":"Potatoes","stores":210},{"plu":"3132","desc":"White Pumpkin","cat":"Pumpkins","stores":3441},{"plu":"3134","desc":"Pie Pumpkins","cat":"Pumpkins","stores":4256},{"plu":"4828","desc":"Carving Pumpkin","cat":"Pumpkins","stores":4235},{"plu":"4066","desc":"Fresh Green Beans","cat":"Soft Vegetables","stores":210},{"plu":"4081","desc":"Purple Eggplant","cat":"Soft Vegetables","stores":4260},{"plu":"4067","desc":"Zucchini Squash","cat":"Squash","stores":138},{"plu":"4750","desc":"Acorn Squash","cat":"Squash","stores":4204},{"plu":"4759","desc":"Butternut Squash","cat":"Squash","stores":4232},{"plu":"4761","desc":"Chayote","cat":"Squash","stores":14},{"plu":"4776","desc":"Spaghetti Squash","cat":"Squash","stores":4234},{"plu":"4782","desc":"Yellow Squash","cat":"Squash","stores":138},{"plu":"4788","desc":"Calabacita Squash","cat":"Squash","stores":94},{"plu":"4074","desc":"Sweet Potatoes Per Pound","cat":"Sweet Potatoes","stores":210},{"plu":"4087","desc":"Roma Tomatoes","cat":"Tomato Romas","stores":210},{"plu":"3151","desc":"Fresh Bulk Slicing Tomatoes","cat":"Tomato Slicers","stores":0},{"plu":"4664","desc":"Tomatoes On The Vine Per Lb","cat":"Tomato Tovs","stores":210},{"plu":"4329","desc":"Honeydew Melon","cat":"Variety Melons","stores":4275},{"plu":"3040","desc":"Dragon Fruit","cat":"Variety Tropicals","stores":3815},{"plu":"4255","desc":"Cactus Pears","cat":"Variety Tropicals","stores":1479},{"plu":"4261","desc":"Coconut","cat":"Variety Tropicals","stores":18},{"plu":"4626","desc":"Jicama","cat":"Variety Tropicals","stores":51},{"plu":"3421","desc":"Mini Watermelon","cat":"Watermelons","stores":210},{"plu":"4032","desc":"Watermelon Seedless","cat":"Watermelons","stores":3302}];
+// ---------------------------------------------------------------------------
+
+const $ = id => document.getElementById(id);
+const byKey = new Map();
+CATALOG.forEach(it => {
+  it.key = it.plu ? "PLU_" + it.plu : it.gtin;
+  byKey.set(it.key, it);
+});
+
+function checkDigit(body) {            // GS1 check digit for any length
+  let s = 0;
+  [...body].reverse().forEach((d, i) => s += +d * (i % 2 === 0 ? 3 : 1));
+  return String((10 - s % 10) % 10);
+}
+// Turn any typed/scanned code into candidate image keys, most likely first.
+function candidates(raw) {
+  const d = String(raw).replace(/\D/g, "");
+  if (!d) return [];
+  const out = [];
+  const t = d.replace(/^0+/, "") || "0";
+  if (t.length <= 5) out.push("PLU_" + t);                    // plain PLU
+  if (t.length <= 6 && t.length > 4) out.push("PLU_" + t.slice(0, -1)); // PLU barcode w/ check digit
+  if (d.length >= 12 && d.length <= 14) {                      // full barcode
+    const g = d.padStart(14, "0").slice(1);
+    if (checkDigit(g.slice(0, 12)) === g[12]) out.push(g);
+  }
+  if (t.length <= 11) {                                        // UPC without check digit (Walmart format)
+    const b = t.padStart(12, "0");
+    out.push(b + checkDigit(b));
+  }
+  return [...new Set(out)];
+}
+
+function loadImage(key) {
+  return new Promise(resolve => {
+    let i = 0;
+    const tryNext = () => {
+      if (i >= EXTS.length) return resolve(null);
+      const src = IMAGE_DIR + key + "." + EXTS[i++];
+      const img = new Image();
+      img.onload = () => resolve({ src, img });
+      img.onerror = tryNext;
+      img.src = src;
+    };
+    tryNext();
+  });
+}
+
+async function find() {
+  const q = $("q").value.trim();
+  $("msg").hidden = true; $("meta").hidden = true;
+  if (!q) return;
+  const keys = candidates(q);
+  $("preview").textContent = "Searching…";
+  // Prefer keys that are in the catalog, but also try the file directly.
+  keys.sort((a, b) => byKey.has(b) - byKey.has(a));
+  for (const key of keys) {
+    const hit = await loadImage(key);
+    if (hit) return show(key, hit);
+  }
+  $("preview").textContent = "No image";
+  const known = keys.map(k => byKey.get(k)).find(Boolean);
+  $("msg").textContent = known
+    ? `${known.desc} is on the list, but its image file is missing (${known.key}).`
+    : `No image found for ${q}. Tried: ${keys.join(", ")}`;
+  $("msg").hidden = false;
+}
+
+function show(key, hit) {
+  const it = byKey.get(key) || {};
+  $("preview").replaceChildren(hit.img);
+  hit.img.alt = it.desc || key;
+  const abs = new URL(hit.src, location.href).href;
+  $("m-desc").textContent = it.desc || key;
+  $("m-file").textContent = hit.src.split("/").pop();
+  $("m-url").textContent = abs; $("m-url").href = abs;
+  $("m-cat").textContent = it.cat || "—";
+  $("m-stores").textContent = it.stores != null ? it.stores.toLocaleString() : "—";
+  $("meta").hidden = false;
+}
+
+$("go").onclick = find;
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") find(); });
+$("copy").onclick = () => {
+  navigator.clipboard?.writeText($("m-url").href);
+  $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy image URL", 1200);
+};
+
+// ---- Gallery ----
+let built = false;
+function buildGrid() {
+  const grid = $("grid");
+  CATALOG.slice().sort((a, b) => a.desc.localeCompare(b.desc)).forEach(it => {
+    const t = document.createElement("button");
+    t.className = "tile";
+    t.dataset.s = (it.desc + " " + (it.plu || it.gtin) + " " + (it.cat || "")).toLowerCase();
+    const ph = document.createElement("div"); ph.className = "ph"; ph.textContent = "Loading…";
+    t.append(ph);
+    const cap = document.createElement("div"); cap.className = "cap";
+    cap.innerHTML = `<b></b><code></code>`;
+    cap.querySelector("b").textContent = it.desc;
+    cap.querySelector("code").textContent = it.plu ? "PLU " + it.plu : it.gtin;
+    t.append(cap);
+    loadImage(it.key).then(hit => {
+      if (hit) { hit.img.loading = "lazy"; hit.img.alt = it.desc; ph.replaceChildren(hit.img); }
+      else { ph.textContent = "Missing image"; t.dataset.missing = "1"; updateCount(); }
+    });
+    t.onclick = () => { $("q").value = it.plu || it.gtin; find(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    grid.append(t);
+  });
+  built = true;
+}
+function updateCount() {
+  const tiles = [...$("grid").children];
+  const vis = tiles.filter(t => !t.hidden).length;
+  const miss = tiles.filter(t => t.dataset.missing).length;
+  $("count").textContent = `${vis} of ${tiles.length} items` + (miss ? ` · ${miss} missing image` : "");
+}
+$("toggle").onclick = () => {
+  if (!built) buildGrid();
+  const open = $("grid").hidden;
+  $("grid").hidden = !open; $("filter").hidden = !open;
+  $("toggle").textContent = open ? "Hide images" : "Show all images";
+  if (open) updateCount(); else $("count").textContent = "";
+};
+$("filter").oninput = e => {
+  const v = e.target.value.toLowerCase().trim();
+  [...$("grid").children].forEach(t => t.hidden = v && !t.dataset.s.includes(v));
+  updateCount();
+};
+</script>
+</body>
+</html>
