@@ -83,7 +83,7 @@ button.primary{background:var(--accent);color:var(--accent-ink);border-color:var
 
 <script>
 // ---- Settings -------------------------------------------------------------
-const IMAGE_DIR = "images/";          // folder next to this page
+const IMAGE_DIRS = ["./", "images/"];  // folders tried, relative to this page
 const EXTS = ["jpg", "png", "webp"];   // tried in this order
 // Catalog: add rows here as more images are added. Use plu for produce,
 // gtin (13-digit, with check digit) for barcoded items.
@@ -125,8 +125,9 @@ function loadImage(key) {
   return new Promise(resolve => {
     let i = 0;
     const tryNext = () => {
-      if (i >= EXTS.length) return resolve(null);
-      const src = IMAGE_DIR + key + "." + EXTS[i++];
+      const combos = IMAGE_DIRS.flatMap(d => EXTS.map(e => d + key + "." + e));
+      if (i >= combos.length) return resolve(null);
+      const src = combos[i++];
       const img = new Image();
       img.onload = () => resolve({ src, img });
       img.onerror = tryNext;
@@ -151,7 +152,7 @@ async function find() {
   $("preview").textContent = "No image";
   const known = keys.map(k => byKey.get(k)).find(Boolean);
   $("msg").textContent = known
-    ? `${known.desc} is on the list, but its image file is missing (${known.key}).`
+    ? `${known.desc} is on the list, but no file was found. Looked for: ${new URL(IMAGE_DIRS[0] + known.key + ".jpg", location.href).href}`
     : `No image found for ${q}. Tried: ${keys.join(", ")}`;
   $("msg").hidden = false;
 }
